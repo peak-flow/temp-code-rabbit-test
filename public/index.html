@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Video Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .rooms-section {
+            margin-top: 40px;
+        }
+        .room-list {
+            list-style: none;
+            padding: 0;
+        }
+        .room-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .room-info h3 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+        .room-info p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .join-btn {
+            background-color: #28a745;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .join-btn:hover {
+            background-color: #1e7e34;
+        }
+        .no-rooms {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 P2P Video Chat</h1>
+
+        <div id="error-message" class="error" style="display: none;"></div>
+
+        <div class="form-group">
+            <label for="roomName">Create New Room:</label>
+            <input type="text" id="roomName" placeholder="Enter room name" required>
+        </div>
+
+        <div class="form-group">
+            <label for="roomDescription">Description (optional):</label>
+            <input type="text" id="roomDescription" placeholder="Room description">
+        </div>
+
+        <button onclick="createRoom()">Create Room</button>
+        <button onclick="loadRooms()">Refresh Rooms</button>
+
+        <div class="rooms-section">
+            <h2>Available Rooms</h2>
+            <ul id="roomList" class="room-list">
+                <li class="no-rooms">Loading rooms...</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Load rooms on page load
+        document.addEventListener('DOMContentLoaded', loadRooms);
+
+        async function createRoom() {
+            const roomName = document.getElementById('roomName').value.trim();
+            const roomDescription = document.getElementById('roomDescription').value.trim();
+
+            if (!roomName) {
+                showError('Please enter a room name');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/rooms', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: roomName,
+                        description: roomDescription
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to create room');
+                }
+
+                const room = await response.json();
+
+                // Clear form
+                document.getElementById('roomName').value = '';
+                document.getElementById('roomDescription').value = '';
+
+                // Refresh room list
+                loadRooms();
+
+                // Optionally redirect to the new room
+                // joinRoom(room.id);
+
+            } catch (error) {
+                showError('Error creating room: ' + error.message);
+            }
+        }
+
+        async function loadRooms() {
+            try {
+                const response = await fetch('/api/rooms');
+                const rooms = await response.json();
+
+                const roomList = document.getElementById('roomList');
+
+                if (rooms.length === 0) {
+                    roomList.innerHTML = '<li class="no-rooms">No rooms available. Create one above!</li>';
+                    return;
+                }
+
+                roomList.innerHTML = rooms.map(room => `
+                    <li class="room-item">
+                        <div class="room-info">
+                            <h3>${escapeHtml(room.name)}</h3>
+                            <p>${escapeHtml(room.description || 'No description')}</p>
+                            <small>Created: ${new Date(room.createdAt).toLocaleString()}</small>
+                        </div>
+                        <button class="join-btn" onclick="joinRoom('${room.id}')">Join Room</button>
+                    </li>
+                `).join('');
+
+            } catch (error) {
+                showError('Error loading rooms: ' + error.message);
+            }
+        }
+
+        function joinRoom(roomId) {
+            const displayName = prompt('Enter your display name:');
+            if (displayName && displayName.trim()) {
+                window.location.href = `room.html?id=${roomId}&name=${encodeURIComponent(displayName.trim())}`;
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Handle Enter key in room name input
+        document.getElementById('roomName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                createRoom();
+            }
+        });
+    </script>
+</body>
+</html>
