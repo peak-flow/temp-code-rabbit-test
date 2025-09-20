@@ -6,7 +6,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+if (process.env.NODE_ENV === 'production') {
+    const origins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+    app.use(cors({
+        origin: (origin, cb) => (!origin || origins.includes(origin)) ? cb(null, true) : cb(new Error('Not allowed by CORS'))
+    }));
+} else {
+    app.use(cors());
+}
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
