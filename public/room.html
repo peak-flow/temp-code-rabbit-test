@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Call Room</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .room-info {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .video-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .video-wrapper {
+            position: relative;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+        }
+
+        .video-element {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-label {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .local-video {
+            border: 3px solid #007bff;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .control-btn {
+            background-color: #444;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            margin: 0 5px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        .control-btn:hover {
+            background-color: #555;
+        }
+
+        .control-btn.active {
+            background-color: #28a745;
+        }
+
+        .control-btn.muted {
+            background-color: #dc3545;
+        }
+
+        .status {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+
+        .participant-list {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .participant-list h3 {
+            margin-top: 0;
+        }
+
+        .participant {
+            padding: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .error {
+            background-color: #dc3545;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .back-btn {
+            background-color: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .back-btn:hover {
+            background-color: #545b62;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎥 Video Call</h1>
+        <a href="index.html" class="back-btn">← Back to Room List</a>
+    </div>
+
+    <div id="room-info" class="room-info">
+        <p>Connecting to room...</p>
+    </div>
+
+    <div id="error-message" class="error" style="display: none;"></div>
+
+    <div id="status" class="status">
+        <p>Initializing...</p>
+    </div>
+
+    <div class="controls">
+        <button id="muteBtn" class="control-btn active" onclick="toggleMute()">🎤 Unmuted</button>
+        <button id="videoBtn" class="control-btn active" onclick="toggleVideo()">📹 Video On</button>
+        <button class="control-btn" onclick="leaveRoom()">📞 Leave Call</button>
+    </div>
+
+    <div id="video-container" class="video-container">
+        <!-- Local video will be added here -->
+        <!-- Remote videos will be added dynamically -->
+    </div>
+
+    <div class="participant-list">
+        <h3>Participants</h3>
+        <div id="participant-list">
+            <!-- Participants will be listed here -->
+        </div>
+    </div>
+
+    <!-- Socket.IO Client -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <!-- WebRTC App Logic -->
+    <script src="app.js"></script>
+
+    <script>
+        // Initialize the app when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get room ID and display name from URL params
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('id');
+            const displayName = urlParams.get('name');
+
+            if (!roomId || !displayName) {
+                showError('Missing room ID or display name. Please go back and join a room properly.');
+                return;
+            }
+
+            // Update room info
+            document.getElementById('room-info').innerHTML = `
+                <h2>Room: ${escapeHtml(roomId)}</h2>
+                <p>You are: ${escapeHtml(displayName)}</p>
+            `;
+
+            // Initialize WebRTC app
+            if (window.initializeWebRTC) {
+                window.initializeWebRTC(roomId, displayName);
+            } else {
+                showError('WebRTC initialization failed. Please refresh the page.');
+            }
+        });
+
+        function toggleMute() {
+            if (window.toggleMute) {
+                const isMuted = window.toggleMute();
+                const btn = document.getElementById('muteBtn');
+                if (isMuted) {
+                    btn.textContent = '🔇 Muted';
+                    btn.classList.remove('active');
+                    btn.classList.add('muted');
+                } else {
+                    btn.textContent = '🎤 Unmuted';
+                    btn.classList.remove('muted');
+                    btn.classList.add('active');
+                }
+            }
+        }
+
+        function toggleVideo() {
+            if (window.toggleVideo) {
+                const isVideoOn = window.toggleVideo();
+                const btn = document.getElementById('videoBtn');
+                if (isVideoOn) {
+                    btn.textContent = '📹 Video On';
+                    btn.classList.add('active');
+                } else {
+                    btn.textContent = '📹 Video Off';
+                    btn.classList.remove('active');
+                }
+            }
+        }
+
+        function leaveRoom() {
+            if (confirm('Are you sure you want to leave the call?')) {
+                if (window.leaveRoom) {
+                    window.leaveRoom();
+                }
+                window.location.href = 'index.html';
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error-message').style.display = 'none';
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = `<p>${escapeHtml(message)}</p>`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Make functions available globally for app.js
+        window.updateStatus = updateStatus;
+        window.showError = showError;
+        window.hideError = hideError;
+    </script>
+</body>
+</html>
